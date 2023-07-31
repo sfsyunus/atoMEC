@@ -25,14 +25,13 @@ from scipy.special import lpmv
 from scipy.integrate import quad
 
 # internal modules
-from atoMEC import mathtools
+from atoMEC import mathtools, config
 
 
 class KuboGreenwood:
     """Class for Kubo-Greenwood conductivity and MIS via TRK sum rule."""
 
     def __init__(self, Atom, model, orbitals, valence_orbs=[], nmax=0, lmax=0):
-
         self._orbitals = orbitals
         self._xgrid = orbitals._xgrid
         self._eigfuncs = orbitals._eigfuncs
@@ -321,7 +320,7 @@ Please run again with spin-unpolarized input."
 
         # initialize sum_mom and various indices
         nbands, nspin, lmax, nmax = np.shape(self._eigvals)
-        sum_mom = np.zeros((nbands))
+        sum_mom = np.zeros((nbands), dtype=config.fp)
 
         # compute the sum rule
         for k in range(nbands):
@@ -518,8 +517,10 @@ Please run again with spin-unpolarized input."
         omega_arr = np.linspace(1e-5, np.sqrt(omega_max), n_freq) ** 2
 
         # set up lorentzian: requires dummy array to get right shape
-        sig_omega = np.zeros((np.size(omega_arr), 2))
-        omega_dummy_mat = np.ones((nbands, lmax, nmax, lmax, nmax, n_freq))
+        sig_omega = np.zeros((np.size(omega_arr), 2), dtype=config.fp)
+        omega_dummy_mat = np.ones(
+            (nbands, lmax, nmax, lmax, nmax, n_freq), dtype=config.fp
+        )
         eig_diff_omega_mat = np.einsum(
             "nijkl,nijklm->nijklm", eig_diff_mat, omega_dummy_mat
         )
@@ -699,7 +700,7 @@ class SphHamInts:
         P2 and P4 functions, ands the :func:`P2_func`, :func:`P4_func` and
         :func:`P_int` functions.
         """
-        P_mat = np.zeros((lmax, lmax, 2 * lmax + 1))
+        P_mat = np.zeros((lmax, lmax, 2 * lmax + 1), dtype=config.fp)
 
         for l1 in range(lmax):
             for l2 in range(lmax):
@@ -994,7 +995,6 @@ class RadialInts:
                     )
 
                     if orb_subset_1 != orb_subset_2:
-
                         R2_mat[:, l2, n2, l1, n1] = cls.R2_int_term(
                             eigfuncs[:, 0, l2, n2], eigfuncs[:, 0, l1, n1], xgrid
                         )

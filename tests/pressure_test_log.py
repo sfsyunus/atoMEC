@@ -15,7 +15,6 @@ from pytest_lazyfixture import lazy_fixture
 
 
 # expected values and tolerance
-
 finite_diff_expected_A = 170.95
 finite_diff_expected_B = 239.70
 stress_tensor_expected_rr = 146.06
@@ -182,6 +181,7 @@ class TestPressure:
         energy = SCF_input["SCF_out"]["energy"]
         rho = SCF_input["SCF_out"]["density"]
         orbs = SCF_input["SCF_out"]["orbitals"]
+        pot = SCF_input["SCF_out"]["potential"]
 
         P_e = h2g * pressure.virial(
             SCF_input["Atom"],
@@ -189,6 +189,7 @@ class TestPressure:
             energy,
             rho,
             orbs,
+            pot,
             use_correction=use_correction,
         )
 
@@ -255,7 +256,6 @@ if __name__ == "__main__":
         TestPressure._run_stress_tensor(SCF_out, False),
     )
     print("Virial pressure corr: ", TestPressure._run_virial(SCF_out, True))
-    print("Virial pressure no corr: ", TestPressure._run_virial(SCF_out, False))
     print("Virial pressure no corr: ", TestPressure._run_virial(SCF_out, False))
     print("Ideal electron: ", TestPressure._run_ideal(SCF_out))
     print("Ion pressure: ", TestPressure._run_ion(SCF_out["Atom"]))

@@ -19,7 +19,7 @@ from scipy.signal import argrelmin
 import numpy as np
 
 # internal modules
-from atoMEC import staticKS, mathtools
+from atoMEC import staticKS, mathtools, check_inputs, config
 
 
 class ELFTools:
@@ -51,6 +51,12 @@ class ELFTools:
         self._xgrid = self._orbs._xgrid
         self.method = method
 
+        if orbitals.grid_type != "log":
+            raise check_inputs.InputError.ELF_error(
+                "Sqrt grid is not yet supported for ELF calculations."
+                "Please switch to log grid."
+            )
+
         # density and occupation numbers have to include bound and free contributions
         self._totdensity = self._density.total
         self._occnums_w = self._orbs.occnums_w
@@ -59,8 +65,8 @@ class ELFTools:
         spindims = np.shape(self._eigfuncs)[1]
         ngrid = np.shape(self._eigfuncs)[4]
 
-        self._ELF = np.zeros((spindims, ngrid))
-        self._epdc = np.zeros((spindims, ngrid))
+        self._ELF = np.zeros((spindims, ngrid), dtype=config.fp)
+        self._epdc = np.zeros((spindims, ngrid), dtype=config.fp)
         self._N_shell = None
 
     @property
@@ -177,7 +183,9 @@ class ELFTools:
         where :math:`\tau^\sigma(r)` is the local kinetic energy density.
         """
         # first compute the contribution from the KED
-        tau = staticKS.Energy.calc_E_kin_dens(eigfuncs, occnums, xgrid, method="B")
+        tau = staticKS.Energy.calc_E_kin_dens(
+            eigfuncs, occnums, xgrid, "log", method="B"
+        )
 
         # compute the density gradient using chain rule
         grad_dens = np.exp(-xgrid) * np.gradient(density, xgrid, axis=-1)
@@ -305,7 +313,6 @@ class ELFTools:
 
         for i in range(spindims):
             for j in range(len(xargs_min[i]) - 1):
-
                 # determine the part of the xgrid lying between two minima
                 xgrid_partition = xgrid[xargs_min[i][j] : xargs_min[i][j + 1] + 1]
 
@@ -318,7 +325,9 @@ class ELFTools:
                 # ELF_partition = ELF[i][xargs_min[i][j] : xargs_min[i][j + 1]]
 
                 # integrate over the density between two minima
-                N_shell[i][j] = mathtools.int_sphere(density_partition, xgrid_partition)
+                N_shell[i][j] = mathtools.int_sphere(
+                    density_partition, xgrid_partition, "log"
+                )
 
         # delete the last element in N_shell (superfluous)
         for i in range(spindims):
@@ -356,7 +365,7 @@ def MIS_count(model, orbitals, core_orbs):
     return MIS
 
 
-def calc_IPR_mat(eigfuncs, xgrid):
+def calc_IPR_mat(eigfuncs, xgrid, grid_type=None):
     r"""
     Calculate the inverse participation ratio for all eigenfunctions (see notes).
 
@@ -389,13 +398,19 @@ def calc_IPR_mat(eigfuncs, xgrid):
        contribution is correctly accounted for). Use at your own peril...
 
     """
+    if grid_type is None:
+        grid_type = "log"
+        print(
+            "No grid type provided, assuming logarathmic grid."
+            "Please check if correct"
+        )
     # get the dimensions for the IPR matrix
     nkpts = np.shape(eigfuncs)[0]
     spindims = np.shape(eigfuncs)[1]
     lmax = np.shape(eigfuncs)[2]
     nmax = np.shape(eigfuncs)[3]
 
-    IPR_mat = np.zeros((nkpts, spindims, lmax, nmax))
+    IPR_mat = np.zeros((nkpts, spindims, lmax, nmax), dtype=config.fp)
 
     # compute the IPR matrix
     # FIXME: add spherical harmonic term
@@ -404,8 +419,11 @@ def calc_IPR_mat(eigfuncs, xgrid):
             for l in range(lmax):
                 for n in range(nmax):
                     # compute |X_nl(x)|^4 = |P_nl(x)|^4 * exp(-2x)
-                    Psi4 = eigfuncs[k, sp, l, n, :] ** 4.0 * np.exp(-2 * xgrid)
+                    if grid_type == "log":
+                        Psi4 = eigfuncs[k, sp, l, n, :] ** 4.0 * np.exp(-2 * xgrid)
+                    else:
+                        Psi4 = eigfuncs[k, sp, l, n, :] ** 4.0
                     # integrate over sphere
-                    IPR_mat[k, sp, l, n] = mathtools.int_sphere(Psi4, xgrid)
+                    IPR_mat[k, sp, l, n] = mathtools.int_sphere(Psi4, xgrid, grid_type)
 
     return IPR_mat
